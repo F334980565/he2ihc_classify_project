@@ -1,7 +1,7 @@
 import os
 import torch
 import torch.nn as nn
-import torchvision.models as models
+from PIL import Image
 import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import Compose, Resize, ToTensor
@@ -29,12 +29,7 @@ def test_labled(model_path, img_save_path):
     test_loader = DataLoader(labeled_dataset, batch_size=1, shuffle=True) 
 
     # 创建 ResNet-34 模型
-    model = models.resnet34(pretrained=True)
-    num_features = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Linear(num_features, 3),
-        nn.Softmax(dim=1)
-    )
+    model = IHC_classifier()
 
     state_dict = torch.load(model_path)
     model.load_state_dict(state_dict)
@@ -61,24 +56,17 @@ def test_labled(model_path, img_save_path):
     print(f'Accuracy on the test set: {accuracy:.2f}%')
     
 
-def test_IHC(model, state_dict_path, save_path = None):
+def test_IHC(model, state_dict_path, dataloader, save_path = None):
     if not save_path == None:
         os.makedirs(os.path.join(save_path, 'csv'), exist_ok=True)
         os.makedirs(os.path.join(save_path, 'img'), exist_ok=True)
     
-    def save_img(img_tensor, save_path):
-        scale = torch.tensor([0.5, 0.5, 0.5]).reshape(3, 1, 1)
-        bias = torch.tensor([0.5, 0.5, 0.5]).reshape(3, 1, 1)
-        img = img_tensor * scale + bias
-        img = 1 - img_tensor
-        img = transforms.ToPILImage()(img)
+    def save_img(img_path, save_path):
+        img = Image.open(img_path)
+        img = img.resize((256, 256), Image.ANTIALIAS)
         img.save(save_path)
         
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-
-    unlabeled_dataset = CompleteDataset(path='/root/projects/wu/Dataset/P63_ruxian_1024')
-
-    test_loader = DataLoader(unlabeled_dataset, batch_size=1, shuffle=True)
 
     state_dict = torch.load(state_dict_path)
     model.load_state_dict(state_dict)
@@ -92,7 +80,7 @@ def test_IHC(model, state_dict_path, save_path = None):
     informs = []
     
     with torch.no_grad():
-        for data in tqdm(test_loader):
+        for data in tqdm(dataloader):
             images, img_path, slice = data['ihc'], data['ihc_path'], data['slice']
             images = images.to(device)
             outputs = model(images)
@@ -121,26 +109,25 @@ def test_HE(model, state_dict_path, dataloader, save_path = None, device='cuda:0
         os.makedirs(os.path.join(save_path, 'csv'), exist_ok=True)
         os.makedirs(os.path.join(save_path, 'img'), exist_ok=True)
     
-    def save_img(he, ihc, save_path):
+    def save_img(he_path, ihc_path, save_path):
+        he_img = Image.open(he_path)
+        ihc_img = Image.open(ihc_path)
         
-        scale = torch.tensor([0.5, 0.5, 0.5]).reshape(3, 1, 1)
-        bias = torch.tensor([0.5, 0.5, 0.5]).reshape(3, 1, 1)
-        
-        he_img = he * scale + bias
-        ihc_img = ihc * scale + bias
-        
-        he_img = 1 - he_img
-        ihc_img = 1 - ihc_img
-        
-        # 将两个图像拼接在一起
-        combined_img = torch.cat((he_img, ihc_img), dim=2)  # 在宽度维度上拼接
-        
-        # 将拼接后的图像转换为 PIL Image
-        combined_img = transforms.Resize((combined_img.shape[1] // 2, combined_img.shape[2] // 2))(combined_img)
-        combined_img = transforms.ToPILImage()(combined_img)
-        
-        # 保存图像
-        combined_img.save(save_path)
+        # Get the dimensions of the images
+        he_width, he_height = he_img.size
+        ihc_width, ihc_height = ihc_img.size
+
+        # Create a new blank image with the combined width and maximum height
+        total_width = he_width + ihc_width
+        max_height = max(he_height, ihc_height)
+        new_img = Image.new('RGB', (total_width, max_height))
+
+        # Paste the images into the new image
+        new_img.paste(he_img, (0, 0))
+        new_img.paste(ihc_img, (he_width, 0))
+
+        # Save the concatenated image
+        new_img.save(save_path)
 
     state_dict = torch.load(state_dict_path)
     model.load_state_dict(state_dict)
@@ -247,11 +234,16 @@ def test_frozenHE(model, state_dict_path, save_path = None):
             writer.writerow([pred, prob, path])
 
 
-model = HE_resnet50()
+model = IHC_classifier()
+state_dict_path = '/home/k611/data2/wu/he2ihc_classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth'
+dataset = data.CompleteDataset(src_path='/home/k611/data3/wu/Dataset/P63_ruxian_1024',
+                               slice_list='all',
+                               is_train=False,
+                               )
 
-test_frozenHE(model, 
-        state_dict_path = '/root/projects/wu/classify_project/checkpoints/HE_resnet50_all/HEresnet50_20epoch.pth', 
-        save_path = '/root/projects/wu/classify_project/probs_save/HE_probs_2_FROZEN_test')
+dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+
+test_IHC(model, state_dict_path = '/home/k611/data2/wu/he2ihc_classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth', dataloader = dataloader, save_path = '/home/k611/data2/wu/he2ihc_classify_project/probs_save/IHC_all')
 
 
 

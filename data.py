@@ -62,14 +62,16 @@ class LabeledDataset(Dataset):
         
         return transform
 
-
 class CompleteDataset(Dataset):
-    def __init__(self, src_path, slice_list, predict_path, is_train=True):
+    def __init__(self, src_path, slice_list, is_train=True, predict_path=None):
         self.transform = self.get_transform(is_train)
         self.src_path = src_path
         self.predict_path = predict_path
         
-        self.slice_list = slice_list
+        if slice_list == 'all':
+            self.slice_list = sorted(os.listdir(src_path))
+        else:
+            self.slice_list = slice_list
         self.slice_dict = {}
         self.index_ranges = {}
         current_index = 0
@@ -83,17 +85,18 @@ class CompleteDataset(Dataset):
             self.index_ranges[slice_name] = (current_index, current_index + slice_len)
             current_index += slice_len
             print(slice_len)
-            
-        df = pd.read_csv(self.predict_path)
-        img_paths = df['img_path'].tolist()
-        predicts = df['predict'].tolist()
-        predict_dict = dict(zip(img_paths, predicts))
-        for slice_name in self.slice_list:
-            slice_predicts = []
-            ihc_paths = self.slice_dict[slice_name][1]
-            for ihc_path in ihc_paths:
-                slice_predicts.append(predict_dict.get(ihc_path))
-            self.slice_dict[slice_name].append(slice_predicts)
+        
+        if not predict_path == None:
+            df = pd.read_csv(self.predict_path)
+            img_paths = df['img_path'].tolist()
+            predicts = df['predict'].tolist()
+            predict_dict = dict(zip(img_paths, predicts))
+            for slice_name in self.slice_list:
+                slice_predicts = []
+                ihc_paths = self.slice_dict[slice_name][1]
+                for ihc_path in ihc_paths:
+                    slice_predicts.append(predict_dict.get(ihc_path))
+                self.slice_dict[slice_name].append(slice_predicts)
         
     def __len__(self):
         
@@ -110,7 +113,8 @@ class CompleteDataset(Dataset):
                 relative_index = idx - start
                 he_path = self.slice_dict[slice_name][0][relative_index]
                 ihc_path = self.slice_dict[slice_name][1][relative_index]
-                predict = self.slice_dict[slice_name][2][relative_index]
+                if not self.predict_path == None:
+                    predict = self.slice_dict[slice_name][2][relative_index]
                 cur_slice = slice_name
                 break
         
@@ -126,7 +130,12 @@ class CompleteDataset(Dataset):
         ihc_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(ihc_img)
         he_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(he_img)
         
-        return {'he': he_img, 'ihc': ihc_img, 'he_path': he_path, 'ihc_path': ihc_path, 'predict':predict, 'slice':cur_slice}
+        if not self.predict_path == None:
+            return_dict = {'he': he_img, 'ihc': ihc_img, 'he_path': he_path, 'ihc_path': ihc_path, 'predict':predict, 'slice':cur_slice}
+        else:
+            return_dict = {'he': he_img, 'ihc': ihc_img, 'he_path': he_path, 'ihc_path': ihc_path, 'slice':cur_slice}
+            
+        return return_dict
     
     def get_transform(self, train=True):
         transform_list = []
