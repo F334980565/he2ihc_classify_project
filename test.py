@@ -63,7 +63,7 @@ def test_IHC(model, state_dict_path, dataloader, save_path = None):
     
     def save_img(img_path, save_path):
         img = Image.open(img_path)
-        img = img.resize((256, 256), Image.ANTIALIAS)
+        img = img.resize((256, 256))
         img.save(save_path)
         
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
@@ -89,7 +89,7 @@ def test_IHC(model, state_dict_path, dataloader, save_path = None):
             total += images.size()[0]
             informs.append((predicted.data.item(), prob.data.item(), img_path[0]))
             if total % 5 == 0:
-                save_img(images[0].cpu(), os.path.join(save_path, 'img', f'{predicted.data.item()}_{prob.data.item()}_{os.path.basename(img_path[0])}'))
+                save_img(img_path[0], os.path.join(save_path, 'img', f'{predicted.data.item()}_{prob.data.item()}_{os.path.basename(img_path[0])}'))
             
             if prob.data.item() > 0.9:
                 high_probs += images.size()[0]
@@ -235,15 +235,15 @@ def test_frozenHE(model, state_dict_path, save_path = None):
 
 
 model = IHC_classifier()
-state_dict_path = '/home/k611/data2/wu/he2ihc_classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth'
-dataset = data.CompleteDataset(src_path='/home/k611/data3/wu/Dataset/P63_ruxian_1024',
+state_dict_path = '/root/projects/wu/classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth'
+dataset = data.CompleteDataset(src_path='/root/projects/wu/Dataset/P63_ruxian_1024',
                                slice_list='all',
                                is_train=False,
                                )
 
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-test_IHC(model, state_dict_path = '/home/k611/data2/wu/he2ihc_classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth', dataloader = dataloader, save_path = '/home/k611/data2/wu/he2ihc_classify_project/probs_save/IHC_all')
+test_IHC(model, state_dict_path = state_dict_path, dataloader = dataloader, save_path = '/home/k611/data2/wu/he2ihc_classify_project/probs_save/IHC_all')
 
 
 
