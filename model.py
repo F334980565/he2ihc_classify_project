@@ -15,6 +15,7 @@ class IHC_classifier(nn.Module):
         # 加载预训练的 ResNet-34 模型
         self.classifier = models.resnet34(pretrained=True)
         
+        
         # 修改最后一个全连接层以适应 num_classes 类分类
         num_features = self.classifier.fc.in_features
         self.classifier.fc = nn.Sequential(

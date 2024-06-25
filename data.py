@@ -61,27 +61,39 @@ class LabeledDataset(Dataset):
             ])
         
         return transform
-    
+
+
 class CompleteDataset(Dataset):
-    def __init__(self, path, is_train=True):
+    def __init__(self, src_path, slice_list, predict_path, is_train=True):
         self.transform = self.get_transform(is_train)
-        self.path = path
+        self.src_path = src_path
+        self.predict_path = predict_path
         
-        self.slice_list = sorted(os.listdir('/root/projects/wu/Dataset/P63_ruxian_1024'))
-        self.slice_list.remove('ping')
+        self.slice_list = slice_list
         self.slice_dict = {}
         self.index_ranges = {}
         current_index = 0
                 
         for slice_name in self.slice_list:
-            slice_file_list = sorted(os.listdir(os.path.join(path, slice_name, 'he')))
-            slice_he_paths = [os.path.join(path, slice_name, 'he', filename) for filename in slice_file_list]
-            slice_ihc_paths = [os.path.join(path, slice_name, 'ihc', filename) for filename in slice_file_list]
+            slice_file_list = sorted(os.listdir(os.path.join(self.src_path, slice_name, 'he')))
+            slice_he_paths = [os.path.join(self.src_path, slice_name, 'he', filename) for filename in slice_file_list]
+            slice_ihc_paths = [os.path.join(self.src_path, slice_name, 'ihc', filename) for filename in slice_file_list]
             self.slice_dict[slice_name] = [slice_he_paths, slice_ihc_paths]
             slice_len = len(self.slice_dict[slice_name][0])
             self.index_ranges[slice_name] = (current_index, current_index + slice_len)
             current_index += slice_len
             print(slice_len)
+            
+        df = pd.read_csv(self.predict_path)
+        img_paths = df['img_path'].tolist()
+        predicts = df['predict'].tolist()
+        predict_dict = dict(zip(img_paths, predicts))
+        for slice_name in self.slice_list:
+            slice_predicts = []
+            ihc_paths = self.slice_dict[slice_name][1]
+            for ihc_path in ihc_paths:
+                slice_predicts.append(predict_dict.get(ihc_path))
+            self.slice_dict[slice_name].append(slice_predicts)
         
     def __len__(self):
         
@@ -98,11 +110,9 @@ class CompleteDataset(Dataset):
                 relative_index = idx - start
                 he_path = self.slice_dict[slice_name][0][relative_index]
                 ihc_path = self.slice_dict[slice_name][1][relative_index]
+                predict = self.slice_dict[slice_name][2][relative_index]
                 cur_slice = slice_name
                 break
-        if 'he_path' not in locals():
-            print(f'index:{idx}')
-            print(self.index_ranges.items())
         
         he_img = Image.open(he_path).convert('RGB')
         ihc_img = Image.open(ihc_path).convert('RGB')
@@ -116,7 +126,7 @@ class CompleteDataset(Dataset):
         ihc_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(ihc_img)
         he_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(he_img)
         
-        return {'he': he_img, 'ihc': ihc_img, 'he_path': he_path, 'ihc_path': ihc_path, 'slice':cur_slice}
+        return {'he': he_img, 'ihc': ihc_img, 'he_path': he_path, 'ihc_path': ihc_path, 'predict':predict, 'slice':cur_slice}
     
     def get_transform(self, train=True):
         transform_list = []
@@ -168,6 +178,51 @@ class IHC_Dataset(Dataset):
 
         if train:
             transform_list.append(transforms.RandomHorizontalFlip())
+
+        transform_list += [transforms.ToTensor()]
+        
+        return transforms.Compose(transform_list)
+    
+class result_Dataset(Dataset):
+    def __init__(self, result_path):
+        self.img_files = os.listdir(result_path)
+        self.he_paths = [os.path.join(result_path, file_name) for file_name in self.img_files if 'real_A' in file_name]
+        self.real_paths = [path.replace('real_A', 'real_B') for path in self.he_paths]
+        self.fake_paths = [path.replace('real_A', 'fake_B') for path in self.he_paths]
+        self.transform = self.get_transform()
+        
+    def __len__(self):
+        return len(self.real_paths)
+
+    def __getitem__(self, idx):
+        
+        he_path = self.he_paths[idx]
+        real_path = self.real_paths[idx]
+        fake_path = self.fake_paths[idx]
+        
+        slice = he_path.split('/')[-1].split('_')[0]
+        
+        he_img = Image.open(he_path).convert('RGB')
+        real_img = Image.open(real_path).convert('RGB')
+        fake_img = Image.open(fake_path).convert('RGB')
+
+        he_img = self.transform(he_img)
+        real_img = self.transform(real_img)
+        fake_img = self.transform(fake_img)
+        
+        he_img = 1 - he_img #从这里开始吧
+        real_img = 1 - real_img
+        fake_img = 1 - fake_img
+        
+        he_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(he_img)
+        real_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(real_img)
+        fake_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(fake_img)
+        
+        return {'he': he_img, 'real': real_img, 'fake': fake_img, 'he_path': he_path, 'real_path': real_path, 'fake_path': fake_path, 'slice':slice}
+    
+    def get_transform(self):
+        transform_list = []
+        transform_list.append(transforms.Resize((512, 512)))
 
         transform_list += [transforms.ToTensor()]
         
@@ -328,4 +383,63 @@ class HEtestDataset(Dataset):
         
         return transforms.Compose(transform_list)
     
-dataset = HEtestDataset(csv_path = '/root/projects/wu/classify_project/probs_save/IHC_probs_2/csv/probs.csv')
+
+
+class FrozenHEDataset(Dataset):
+    def __init__(self, root_dir,slice_list):
+        self.root_dir = root_dir
+        self.transform = self.get_transform
+        self.images = []
+        self.img_paths = []
+        self.slices = []
+
+        # 遍历文件夹，收集图像文件路径和切片信息
+        for slice_name in slice_list:
+            root_dir1 = os.path.join(root_dir,slice_name)
+            for root, _, files in os.walk(root_dir1):
+                for file in files:
+                    if file.endswith(".png") or file.endswith(".jpg"):
+                        img_path = os.path.join(root, file)
+                        slice_name = os.path.basename(root)
+                        self.images.append(img_path)
+                        self.img_paths.append(img_path)
+                        self.slices.append(slice_name)
+
+    def __len__(self):
+        return len(self.images)
+
+    def __getitem__(self, idx):
+        img_path = self.images[idx]
+        slice_name = self.slices[idx]
+
+        he_path = img_path
+        he_img = Image.open(he_path).convert('RGB')
+        # he_img = self.transform(he_img)
+        transform = self.get_transform()
+        he_img = transform(he_img)
+        he_img = 1 - he_img
+        he_img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(he_img)
+        return {'he': he_img, 'he_path': he_path, 'slice': slice_name}
+
+    # def get_transform(self, is_train=False):
+    #     transform_list = []
+    #     transform_list.append(transforms.Resize((512, 512)))
+
+    #     if is_train:
+    #         transform_list.append(transforms.RandomHorizontalFlip())
+
+    #     transform_list += [transforms.ToTensor()]
+
+    #     return transforms.Compose(transform_list)
+
+    def get_transform(self, is_train=False):
+        transform_list = []
+        transform_list.append(transforms.Resize((512, 512)))
+
+        if is_train:
+            transform_list.append(transforms.RandomHorizontalFlip())
+
+        transform_list += [transforms.ToTensor()]
+
+        transform = transforms.Compose(transform_list)  # 获取变换对象
+        return transform

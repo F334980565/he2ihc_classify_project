@@ -93,7 +93,7 @@ def train_unlabled(model, dataloader, num_epoch, device, save_path):
             correct += (predicted == labels).sum().item()
             cur_accuracy = 100 * correct / total
             if n % 10 == 0:
-                print(f'Current iter:{n}, Current accuracy: {cur_accuracy:.2f}%')sZ
+                print(f'Current iter:{n}, Current accuracy: {cur_accuracy:.2f}%')
             n += 1
 
         accuracy = 100 * correct / total
