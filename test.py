@@ -1,5 +1,6 @@
 import os
 import torch
+import pandas as pd
 import torch.nn as nn
 from PIL import Image
 import torchvision.transforms as transforms
@@ -142,14 +143,14 @@ def test_HE(model, state_dict_path, dataloader, save_path = None, device='cuda:0
     
     with torch.no_grad():
         for data in tqdm(dataloader):
-            he, ihc, img_path, slice = data['he'].to(device), data['ihc'].to(device), data['ihc_path'], data['slice']
+            he, ihc, he_path, ihc_path, slice = data['he'].to(device), data['ihc'].to(device), data['he_path'], data['ihc_path'], data['slice']
             outputs = model(he)
             prob, predicted = torch.max(outputs.data, 1)
             #print(f'置信度：{prob}, 预测值：{predicted}, 路径：{img_path}')
             total += he.size()[0]
-            informs.append((predicted.data.item(), prob.data.item(), img_path[0]))
+            informs.append((predicted.data.item(), prob.data.item(), ihc_path[0]))
             if total % 5 == 0:
-                save_img(he[0].cpu(), ihc[0].cpu(), os.path.join(save_path, 'img', f'{predicted.data.item()}_{prob.data.item()}_{os.path.basename(img_path[0])}'))
+                save_img(he_path[0], ihc_path[0], os.path.join(save_path, 'img', f'{predicted.data.item()}_{prob.data.item()}_{os.path.basename(ihc_path[0])}'))
             
             if prob.data.item() > 0.9:
                 high_probs += he.size()[0]
@@ -157,11 +158,24 @@ def test_HE(model, state_dict_path, dataloader, save_path = None, device='cuda:0
     high_prob_rate = high_probs / total
     print(f'high prob rate on complete dataset: {high_prob_rate:.2f}%')
     
-    with open(os.path.join(save_path, 'csv', 'probs.csv'), 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['predict', 'prob', 'img_path'])
-        for pred, prob, path in informs:
-            writer.writerow([pred, prob, path])
+    csv_file_path = os.path.join(save_path, 'csv', 'probs.csv')
+    header = ['predict', 'prob', 'img_path']
+    if os.path.exists(os.path.join(save_path, 'csv', 'probs.csv')):
+        # Read the existing file
+        df_existing = pd.read_csv(csv_file_path)
+        # Ensure the header matches
+        if not all(df_existing.columns == header):
+            raise ValueError("CSV file exists but the header does not match the expected header.")
+        # Convert the informs to a DataFrame
+        df_new = pd.DataFrame(informs, columns=header)
+        # Append new rows to the existing DataFrame
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+    else:
+        # Convert the informs to a DataFrame
+        df_combined = pd.DataFrame(informs, columns=header)
+        
+        # Save the DataFrame back to CSV
+        df_combined.to_csv(csv_file_path, index=False)
 """    
 model = HE_resnet50()
 
@@ -179,7 +193,7 @@ test_HE(model,
 """
 
 
-def test_frozenHE(model, state_dict_path, save_path = None):
+def test_frozenHE(model, state_dict_path, dataloader, save_path = None):
     if not save_path == None:
         os.makedirs(os.path.join(save_path, 'csv'), exist_ok=True)
         os.makedirs(os.path.join(save_path, 'img'), exist_ok=True)
@@ -194,10 +208,6 @@ def test_frozenHE(model, state_dict_path, save_path = None):
         
     device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
 
-    test_slice_list = ['B008490_frozen', 'B008330_frozen', 'B008243_frozen', 'B008012_frozen', 'B007928_frozen']
-    test_dataset = FrozenHEDataset("/root/projects/wu/Dataset/test_P63_FROZEN",test_slice_list)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
     state_dict = torch.load(state_dict_path)
     model.load_state_dict(state_dict)
     model.to(device)
@@ -210,7 +220,7 @@ def test_frozenHE(model, state_dict_path, save_path = None):
     informs = []
     
     with torch.no_grad():
-        for data in tqdm(test_loader):
+        for data in tqdm(dataloader):
             images, img_path, slice = data['he'], data['he_path'], data['slice']
             images = images.to(device)
             outputs = model(images)
@@ -227,23 +237,23 @@ def test_frozenHE(model, state_dict_path, save_path = None):
     high_prob_rate = high_probs / total
     print(f'high prob rate on complete dataset: {high_prob_rate:.2f}%')
     
-    with open(os.path.join(save_path, 'csv', 'prob            s.csv'), 'w', newline='') as csvfile:
+    with open(os.path.join(save_path, 'csv', 'probs.csv'), 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['predict', 'prob', 'img_path'])
         for pred, prob, path in informs:
             writer.writerow([pred, prob, path])
 
 
-model = IHC_classifier()
-state_dict_path = '/root/projects/wu/classify_project/checkpoints/IHCclassifier/IHCclassifer_10epoch.pth'
+model = HE_resnet50()
+state_dict_path = '/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide_2/HEresnet50_20epoch.pth'
 dataset = data.CompleteDataset(src_path='/root/projects/wu/Dataset/P63_ruxian_1024',
-                               slice_list='all',
-                               is_train=False,
+                               slice_list=['A009798', 'A14946', 'C105560', 'C152536', 'C152221', 'A18480', 'C133447', 'C136881'],
+                               is_train=False
                                )
 
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
 
-test_IHC(model, state_dict_path = state_dict_path, dataloader = dataloader, save_path = '/home/k611/data2/wu/he2ihc_classify_project/probs_save/IHC_all')
+test_HE(model, state_dict_path = state_dict_path, dataloader = dataloader, save_path = '/root/projects/wu/classify_project/probs_save/HE_probs_slicedivide2')
 
 
 

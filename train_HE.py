@@ -32,7 +32,7 @@ def train(model, train_loader, num_epochs, save_path, model_name, checkpoint=Non
         total = 0
         total_loss = 0
         n = 0
-        for data in train_loader:
+        for data in tqdm(train_loader):
             images = data['he'].to(device)
             labels = data['predict'].to(device)
             # 前向传播
@@ -89,26 +89,11 @@ def test(model, test_loader, model_state_path):
 #train_dataset = HE_Dataset(csv_path='/root/projects/wu/classify_project/probs_save/IHC_probs_2/csv/probs.csv', is_train=True) 这两是训70%训练集，30%数据集，不独立切片，看看效果
 #test_dataset = HE_Dataset(csv_path='/root/projects/wu/classify_project/probs_save/IHC_probs_2/csv/probs.csv', is_train=False)
 all_dataset = HE_all_Dataset(csv_path='/root/projects/wu/classify_project/probs_save/IHC_probs_2/csv/probs.csv')
-train_slice_list = ['A007418', 'A012607', 'A013564', 'A13923', 'A14053', 'A15331', 'A15520', 'A16746', 'A16886', 'A154421', 'C104494', 'C113327']
-train_dataset = CompleteDataset(src_path = '/root/projects/wu/Dataset/P63_ruxian_1024', slice_list = train_slice_list, predict_path='/root/projects/wu/classify_project/probs_save/IHC_probs_2/csv/probs.csv')
+train_slice_list = ['C113327', 'A15520', 'A007418', 'A154421', 'A16746', 'A17244', 'A16886', 'A013564', 'A15331', 'A14053', 'C104494', 'A13923', 'A012607', 'C152280', 'A8827', 'A10032']
+train_dataset = CompleteDataset(src_path = '/root/projects/wu/Dataset/P63_ruxian_1024', slice_list = train_slice_list, predict_path='/root/projects/wu/classify_project/probs_save/IHC_probs_3_P63120all/csv/probs.csv')
 
 train_loader = DataLoader(train_dataset, batch_size=19, shuffle=True)
-#test_loader = DataLoader(test_dataset, batch_size=65, shuffle=False)
-#all_train_loader = DataLoader(all_dataset, batch_size=19, shuffle=True)
 
 model = HE_resnet50()
 
-#train(model, train_loader, num_epochs=15, save_path='/root/projects/wu/classify_project/checkpoints/HE_resnet50', model_name='HEresnet50')
-"""
-best_accuracy = 0
-best_epoch = 0
-for epoch in range(5, 30):
-    print(f'current epoch: {epoch}')
-    accuracy = test(model, test_loader, model_state_path=f'/root/projects/wu/classify_project/checkpoints/HE_resnet50_all/HEresnet50_{epoch}epoch.pth')
-    if accuracy >= best_accuracy:
-        print(f'new_best_accuracy: {accuracy}, epoch:{epoch}')
-        best_epoch = epoch
-print(f'best_epoch:{best_epoch}')
-"""
-
-train(model, train_loader, num_epochs=20, save_path='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide', model_name='HEresnet50', checkpoint='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide/HEresnet50_8epoch.pth')
+train(model, train_loader, num_epochs=20, save_path='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide_2', model_name='HEresnet50', checkpoint='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide/HEresnet50_10epoch.pth')

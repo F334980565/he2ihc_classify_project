@@ -41,6 +41,24 @@ def create_file_list_csv(path1, path2, csv_file):
         writer.writerow(['File Name'])
         writer.writerows([[file_path] for file_path in file_path_list])
         
+def replace_img_path_in_csv(file_path, old_str, new_str):
+    """
+    Replace a substring in the 'img_path' column of a CSV file and overwrite the original file.
+
+    Args:
+    file_path (str): Path to the CSV file.
+    old_str (str): The substring to be replaced.
+    new_str (str): The new substring to replace the old one.
+    """
+    # Read the CSV file into a DataFrame
+    df = pd.read_csv(file_path)
+
+    # Replace the old substring with the new substring in the 'img_path' column
+    df['img_path'] = df['img_path'].str.replace(old_str, new_str)
+
+    # Save the modified DataFrame back to the original CSV file
+    df.to_csv(file_path, index=False)
+        
 def create_heatmap(csv_path, save_path, map_name):
     os.makedirs(save_path, exist_ok=True)
     
@@ -208,6 +226,14 @@ result_analyze(result_path = '/root/projects/wu/he2ihc/results/betatest_P63fenle
                save_path = '/root/projects/wu/he2ihc/results/betatest_P63fenlei/test_80/result_analyze',
                device = 'cuda:0')
 """
-create_heatmap(csv_path = '/root/projects/wu/classify_project/probs_save/HE_probs_2_slicedivide/csv/probs.csv',
-               save_path = '/root/projects/wu/classify_project/probs_save/HE_probs_2_slicedivide/heatmap',
+
+create_heatmap(csv_path = '/root/projects/wu/classify_project/probs_save/HE_probs_slicedivide2/csv/probs.csv',
+               save_path = '/root/projects/wu/classify_project/probs_save/HE_probs_slicedivide2/heatmap',
                map_name = 'heatmap')
+
+"""
+file_path = '/root/projects/wu/classify_project/probs_save/IHC_probs_3_P63120all/csv/probs.csv'
+old_str = '/home/s611/Projects'
+new_str = '/root/projects'
+replace_img_path_in_csv(file_path, old_str, new_str)
+"""
