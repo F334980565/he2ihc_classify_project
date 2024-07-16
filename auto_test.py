@@ -158,11 +158,12 @@ def find_parameter(df_path):
     plt.show()
 
 def train_parameter(device='cuda:0'):
-    dataset = CompleteDataset(src_path = '/home/f611/Projects/data/Dataset_171/P63_ruxian_1024', 
+    #/home/f611/Projects/wu/he2ihc_classify_project/results/IHC_all/csv/probs.csv'
+    dataset = CompleteDataset(src_path = '/home/f611/Projects/data/Dataset_171/CK56_ruxian_1024', 
                         slice_list = 'all',
                         is_train=True,
-                        predict_path='/home/f611/Projects/wu/he2ihc_classify_project/results/IHC_all/csv/probs.csv',
-                        use_pool=False)
+                        predict_path=None,
+                        use_pool=True)
     
     dataloader = DataLoader(dataset=dataset, batch_size=12, shuffle=True)
     model = pool512_ResNet50().to(device)
@@ -181,11 +182,10 @@ def train_parameter(device='cuda:0'):
         total_loss = 0
         n = 0
         for data in tqdm(dataloader):
-            img_tensor = data['ihc'].to(device)
+            img_tensor = data['he'].to(device)
             labels = data['predict'].to(device)
             img_path = data['ihc_path']
             
-            img_tensor = (1 - img_tensor) 
             outputs = model(img_tensor)
             predict = torch.argmax(outputs, 1)
             
@@ -205,14 +205,14 @@ def train_parameter(device='cuda:0'):
                 #print(f'Current iter:{n}, Current avg loss:{cur_avg_loss}')
                 print(f'Current iter:{n}, Current avg loss:{cur_avg_loss}, Current accuracy:{cur_accuracy}')
             n += 1
-                
-            scheduler.step()
+            
             #accuracy = 100 * correct / total
             
             average_loss = total_loss / len(dataloader)
             
         #print(f'Epoch [{epoch+1}/2], Loss: {average_loss.item():.4f}, Accuracy:{accuracy:.2f}%')
         print(f'Epoch [{epoch+1}/2], Loss: {average_loss.item():.4f}')
+        scheduler.step()
 
         torch.save(model.state_dict(), os.path.join('/home/f611/Projects/wu/he2ihc_classify_project/checkpoints/HEpool_classifier' ,f'pool512_CK56_2.3_0.7_classifer_{epoch+1}epoch.pth'))
         print(f'Model saved')
