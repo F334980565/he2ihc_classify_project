@@ -7,6 +7,7 @@ import torchvision.transforms as transforms
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import Compose, Resize, ToTensor
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from data import LabeledDataset, CompleteDataset,FrozenHEDataset
 from model import HE_resnet50, IHC_classifier
 from tqdm import tqdm
@@ -242,7 +243,6 @@ def test_frozenHE(model, state_dict_path, dataloader, save_path = None):
         writer.writerow(['predict', 'prob', 'img_path'])
         for pred, prob, path in informs:
             writer.writerow([pred, prob, path])
-
 
 model = HE_resnet50()
 state_dict_path = '/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide_2/HEresnet50_20epoch.pth'

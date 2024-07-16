@@ -227,13 +227,13 @@ result_analyze(result_path = '/root/projects/wu/he2ihc/results/betatest_P63fenle
                device = 'cuda:0')
 """
 
+"""
 create_heatmap(csv_path = '/root/projects/wu/classify_project/probs_save/HE_probs_slicedivide2/csv/probs.csv',
                save_path = '/root/projects/wu/classify_project/probs_save/HE_probs_slicedivide2/heatmap',
                map_name = 'heatmap')
+"""
 
-"""
-file_path = '/root/projects/wu/classify_project/probs_save/IHC_probs_3_P63120all/csv/probs.csv'
-old_str = '/home/s611/Projects'
-new_str = '/root/projects'
+file_path = '/home/f611/Projects/wu/he2ihc_classify_project/results/IHC_all/csv/probs.csv'
+old_str = '/root/projects/wu/Dataset/P63_ruxian_1024'
+new_str = '/home/f611/Projects/data/Dataset_171/P63_ruxian_1024'
 replace_img_path_in_csv(file_path, old_str, new_str)
-"""
