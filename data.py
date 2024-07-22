@@ -67,20 +67,25 @@ class LabeledDataset(Dataset):
 
 class CompleteDataset(Dataset): #这个是读Datset_171里的数据集的时候用的
     def __init__(self, src_path, slice_list, is_train=False, predict_path=None, use_pool=False, stain_name = 'P63'):
+        self.slice_list = slice_list
         self.src_path = src_path
         self.predict_path = predict_path
         self.use_pool = use_pool
         self.is_train = is_train
+        self.stain_name = stain_name
         if use_pool:
+            if stain_name == 'P63_temp':
+                self.params = [16, 1.2, 0.5]
             if stain_name == 'P63':
-                self.params = [1, 1, 1, 1.9, 0.5]
+                self.params = [8, 1.9, 0.5]
             elif stain_name == 'CK56':
-                self.params = [1, 1, 1, 2.3, 0.7]
-
+                self.params = [8, 2.25, 0.4]
+            elif stain_name == 'P16':
+                self.params = [16, 2.0, 0.7]
+                
         if slice_list == 'all':
             self.slice_list = sorted([name for name in os.listdir(src_path) if os.path.isdir(os.path.join(src_path, name))])
-        else:
-            self.slice_list = slice_list
+
         self.slice_dict = {}
         self.index_ranges = {}
         current_index = 0
@@ -111,7 +116,7 @@ class CompleteDataset(Dataset): #这个是读Datset_171里的数据集的时候�
         n = 0
         for slice in self.slice_list:
             n += len(self.slice_dict[slice][0])
-            
+
         return n
 
     def __getitem__(self, idx):
@@ -139,8 +144,11 @@ class CompleteDataset(Dataset): #这个是读Datset_171里的数据集的时候�
         ihc_tensor = transform(ihc_img)
         
         if self.use_pool:
-            predict, predict_tensor = self.get_label_tensor(ihc_tensor, self.params)
-            return_dict = {'he': he_tensor, 'ihc': ihc_tensor, 'he_path': he_path, 'ihc_path': ihc_path, 'predict_tensor':predict_tensor, 'predict':predict, 'slice':cur_slice}
+            #if self.stain_name == 'CK56':
+                #predict, predict_tensor = self.get_CK56_label(ihc_tensor, self.params)
+            #else:
+            predict, predict_tensor, sum = self.get_label_tensor(ihc_tensor, self.params)
+            return_dict = {'he': he_tensor, 'ihc': ihc_tensor, 'he_path': he_path, 'ihc_path': ihc_path, 'predict_tensor':predict_tensor, 'predict':predict, 'slice':cur_slice, 'sum': sum}
         elif not self.predict_path == None:
             return_dict = {'he': he_tensor, 'ihc': ihc_tensor, 'he_path': he_path, 'ihc_path': ihc_path, 'predict':predict, 'slice':cur_slice}
         else:
@@ -160,13 +168,36 @@ class CompleteDataset(Dataset): #这个是读Datset_171里的数据集的时候�
         
         return transforms.Compose(transform_list)
     
-    def get_label_tensor(self, img_tensor, params = [1, 1, 1, 2.3, 0.7]):
+    def get_label_tensor(self, img_tensor, params = [8, 2.3, 0.7]):
         img_tensor = (1 - img_tensor) / 2
-        a, b, c, positive_threshold, background_threshold = params
-        avg_pool_8 = F.avg_pool2d(img_tensor, kernel_size=(8, 8))
-        max_pool_256 = F.max_pool2d(avg_pool_8, kernel_size=(32, 32))
-        max_pool_512 = F.max_pool2d(avg_pool_8, kernel_size=(64, 64))
-        sum = max_pool_512.sum()
+        img_size = img_tensor.shape[-1]
+        k, positive_threshold, background_threshold = params
+        avg_pool_8 = F.avg_pool2d(img_tensor, kernel_size=(k, k))
+        max_pool_256 = F.max_pool2d(avg_pool_8, kernel_size=(img_size // (2*k), img_size // (2*k)))
+        max_pool_512 = F.max_pool2d(avg_pool_8, kernel_size=(img_size // k, img_size // k))
+        #sum = max_pool_512.sum()
+        sum = 0.0 * max_pool_512[0] + 0.0 * max_pool_512[1] + 3.0 * max_pool_512[2]
+        if sum > positive_threshold:
+            predict = 0
+        elif sum <= positive_threshold and sum >= background_threshold:
+            predict = 1
+        else:
+            predict = 2
+        
+        summed_tensor = torch.sum(max_pool_256, dim=0)
+        predict_tensor = torch.where(summed_tensor > positive_threshold, 0,
+                                    torch.where((summed_tensor <= positive_threshold) & (summed_tensor >= background_threshold), 1, 2))
+        
+        return predict, predict_tensor, sum
+
+    def get_CK56_label(self, img_tensor, params = [8, 2.3, 0.7]):
+        img_tensor = (1 - img_tensor) / 2
+        img_size = img_tensor.shape[-1]
+        k, positive_threshold, background_threshold = params
+        avg_pool_8 = F.avg_pool2d(img_tensor, kernel_size=(k, k))
+        max_pool_256 = F.max_pool2d(avg_pool_8, kernel_size=(img_size // (2*k), img_size // (2*k)))
+        max_pool_512 = F.max_pool2d(avg_pool_8, kernel_size=(img_size // k, img_size // k))
+        sum = max_pool_512[0] + max_pool_512[1]
         if sum > positive_threshold:
             predict = 0
         elif sum <= positive_threshold and sum >= background_threshold:

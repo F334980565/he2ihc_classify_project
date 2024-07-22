@@ -1,3 +1,4 @@
+#%%
 import os
 import torch
 from model import IHC_classifier, HE_resnet34, HE_resnet50, pool_ResNet50
@@ -154,3 +155,4 @@ model = pool_ResNet50()
 
 train_pool(model, train_loader, num_epochs = 20, save_path = '/home/f611/Projects/wu/he2ihc_classify_project/checkpoints/pool_classifier', model_name = 'pool_classifier_unet', checkpoint=None)
 #train(model, train_loader, num_epochs=20, save_path='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide_2', model_name='HEresnet50', checkpoint='/root/projects/wu/classify_project/checkpoints/HE_resnet50_slicedivide/HEresnet50_10epoch.pth')
+# %%
